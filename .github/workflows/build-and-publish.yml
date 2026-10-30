@@ -1,0 +1,46 @@
+name: Publish website and build mod
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  website:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4
+  build:
+    if: ${{ hashFiles('MinotaurArcade/MinotaurArcade.csproj') != '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Pathoschild/SMAPI-ModBuildWorkflow/add-build-environment@v1
+      - run: dotnet build MinotaurArcade/MinotaurArcade.csproj --configuration Release --verbosity minimal
+      - name: Create install ZIP
+        run: python3 scripts/package.py
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view auto-build >/dev/null 2>&1; then
+            gh release upload auto-build dist/MinotaurArcade.zip dist/SHA256SUMS.txt --clobber
+          else
+            gh release create auto-build dist/MinotaurArcade.zip dist/SHA256SUMS.txt --title "Minotaur Arcade · сборка" --notes "Экспериментальный мод. Требуется проверка в игре."
+          fi
