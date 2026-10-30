@@ -1,40 +1,35 @@
 name: Build Minotaur Arcade (ready-to-install ZIP)
-
 on:
   push:
     branches: [main]
   workflow_dispatch:
-
 permissions:
   contents: write
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Extract embedded mod sources
-        run: unzip -oq source/MinotaurArcade_Source_v0.2.1.zip 'MinotaurArcade/*'
+      - uses: actions/checkout@v4
+      - name: Extract v0.3.0 game source
+        run: unzip -oq source/MinotaurArcade_Source_v0.3.0.zip 'MinotaurArcade/*'
       - name: Prepare Stardew Valley and SMAPI build dependencies
         uses: Pathoschild/SMAPI-ModBuildWorkflow/add-build-environment@v1
       - name: Compile mod DLL
         run: dotnet build MinotaurArcade/MinotaurArcade.csproj -c Release --verbosity minimal
-      - name: Package installable mod (not source code)
+      - name: Package ready-to-install mod
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p dist/MinotaurArcade
+          mkdir -p dist/MinotaurArcade/assets
           DLL="$(find MinotaurArcade/bin/Release -name MinotaurArcade.dll -print -quit)"
           test -n "$DLL"
           cp "$DLL" dist/MinotaurArcade/MinotaurArcade.dll
           cp MinotaurArcade/manifest.json dist/MinotaurArcade/manifest.json
-          mkdir -p dist/MinotaurArcade/assets
           cp MinotaurArcade/assets/*.png dist/MinotaurArcade/assets/
           cd dist
           zip -qr MinotaurArcade.zip MinotaurArcade
           sha256sum MinotaurArcade.zip > SHA256SUMS.txt
-      - name: Publish ready-to-install ZIP
+      - name: Publish compiled zip in release
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -43,5 +38,5 @@ jobs:
           if gh release view auto-build >/dev/null 2>&1; then
             gh release upload auto-build dist/MinotaurArcade.zip dist/SHA256SUMS.txt --clobber
           else
-            gh release create auto-build dist/MinotaurArcade.zip dist/SHA256SUMS.txt --title "Minotaur Arcade — compiled mod" --notes "Experimental build; in-game testing required."
+            gh release create auto-build dist/MinotaurArcade.zip dist/SHA256SUMS.txt --title "Minotaur Arcade - compiled mod" --notes "Experimental build: multiplayer testing required."
           fi
